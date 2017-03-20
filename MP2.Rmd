@@ -7,10 +7,16 @@ output: html_document
 
 ```{r}
 #filter candidates by year
-candidates2012<- filter(candidates, cand_election_yr=="2012")
+candidates2012<- filter(candidates, cand_election_yr=="2012") 
 ```
 ```{r}
 contributions2012<- filter(contributions, transaction_dt>="11022010")
 ```
+```{r}
+#Based on our assumptions, the transaction amount should always be a + number. The data does not look clean (many transaction amounts are - amounts)
+#We decided to take away the negative sign and assume that was the amount the person contributed
+#contributions2012 <- mutate(contributions2012, transaction_amt=-c("-"))
+```
+
 
 
