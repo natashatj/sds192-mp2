@@ -1,0 +1,16 @@
+---
+title: "MP2"
+author: "Zoe Meers"
+date: "3/20/2017"
+output: html_document
+---
+
+```{r}
+#filter candidates by year
+filter(candidates, cand_election_yr=="2012")
+```
+```{r}
+
+```
+
+
