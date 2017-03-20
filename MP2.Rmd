@@ -7,10 +7,10 @@ output: html_document
 
 ```{r}
 #filter candidates by year
-filter(candidates, cand_election_yr=="2012")
+candidates2012<- filter(candidates, cand_election_yr=="2012")
 ```
 ```{r}
-
+contributions2012<- filter(contributions, transaction_dt>="11022010")
 ```
 
 
