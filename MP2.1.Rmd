@@ -1,0 +1,44 @@
+---
+title: "MP2"
+author: "Zoe Meers"
+date: "3/20/2017"
+output: html_document
+---
+```{r}
+#load data sets
+load("house_elections.rda")
+load("candidates.rda")
+load("committees.rda")
+load("contributions.rda")
+```
+```{r}
+str(house_elections)
+str(committees)
+str(candidates)
+str(contributions)
+```
+
+
+
+```{r}
+#filter candidates by year
+candidates2012<- filter(candidates, cand_election_yr=="2012") 
+```
+```{r}
+#filter transactions for 2012 election only.
+#2010 midterms were helf on the 11/02/10, so transactions on or after this date are most likely for 2012
+contributions2012<- filter(contributions, transaction_dt>="11022010")
+#filters for transaction dates before the 2012 election. We don't want contributions for the 2014 midterms.
+contributions2012<- filter(contributions, transaction_dt<"11052012")
+```
+```{r}
+#Based on our assumptions, the transaction amount should always be a + number. The data does not look clean (many transaction amounts are - amounts)
+#We decided to take away the negative sign using regex (gsub) and assume that was the amount the person contributed
+contributions2012$transaction_amt= as.numeric(gsub("-", "", contributions2012$transaction_amt))
+```
+
+```{r}
+
+```
+
+
