@@ -1,0 +1,322 @@
+---
+title: "MP2"
+author: "Zoe Meers"
+date: "3/20/2017"
+output: html_document
+---
+```{r}
+#load data sets
+load("house_elections.rda")
+load("candidates.rda")
+load("committees.rda")
+load("contributions.rda")
+library(tidyverse)
+#install
+library(choroplethrMaps)
+#install
+library(choroplethr)
+#install
+library(maps)
+#install
+library(fiftystater)
+#install
+library(maptools)
+#install
+library(rgeos)
+#install
+library(rgdal)
+
+library(dplyr)
+```
+
+
+```{r}
+#filter candidates by year
+candidates2012<-filter(candidates, cand_election_yr=="2012")
+#filter contributions by individual contributions to HELP a candidate be elected
+contributions2012<-filter(contributions, transaction_type=="24E")
+#filter negative contributions
+contributions2012<-filter(contributions2012, transaction_amt==gsub('-[A-z ]*', '', transaction_amt))
+contributions2012<-filter(contributions2012, transaction_amt==gsub('0', '', transaction_amt))
+count(contributions2012$transaction_amt)
+```
+```{r}
+#filter transactions for 2012 election only.
+#2010 midterms were helf on the 11/02/10, so transactions on or after this date are most likely for 2012
+contributions2012<- filter(contributions, transaction_dt>="11022010")
+#filters for transaction dates before the 2012 election. We don't want contributions for the 2014 midterms.
+contributions2012<- filter(contributions, transaction_dt<"11052012")
+```
+
+```{r}
+sum_cand<- aggregate(transaction_amt~cand_id, data=contributions2012, FUN=function(x) c(sum=sum(x), count=length(x)))
+sum_cand <- sum_cand[-c(1), ]
+sum_cand$'transaction_amt' = round(sum_cand$'transaction_amt')
+```
+
+
+```{r}
+party_id <- candidates2012 %>%
+  inner_join(sum_cand, by = ("cand_id"))
+```
+
+
+```{r}
+#democrats2012 - candidates
+democrats2012<- filter(party_id, cand_party_affiliation=="DEM")
+#repubs2012 - candidates
+republicans2012 <- filter(party_id, cand_party_affiliation=="REP")
+```
+
+
+```{r}
+#aggregate sum of transaction amt by state - dem
+sum_dem<- aggregate(transaction_amt~cand_office_state, data=democrats2012, FUN=function(x) c(sum=sum(x), count=length(x)))
+#aggregate sum of transaction amt by state - rep
+sum_rep<- aggregate(transaction_amt~cand_office_state, data=republicans2012, FUN=function(x) c(sum=sum(x), count=length(x)))
+```
+```{r}
+sum_dem <- rename(sum_dem, c(cand_office_state="State"))
+sum_rep <- rename(sum_rep, c(cand_office_state="State"))
+```
+```{r}
+#cut US, PR, AS, GU, DC, MP, VI
+sum_dem <- sum_dem[-c(3,8,12,41,47,50), ]
+sum_rep <- sum_rep[-c(11,45), ]
+sum_dem$'V1' = round(sum_dem$'V1')
+sum_rep$'V1' = round(sum_rep$'V1')
+```
+
+```{r}
+#MAP
+#using code from: https://cran.r-project.org/web/packages/fiftystater/vignettes/fiftystater.html
+transform_state <- function(object, rot, scale, shift){
+  object %>% elide(rotate = rot) %>%
+    elide(scale = max(apply(bbox(object), 1, diff)) / scale) %>%
+    elide(shift = shift)
+}
+
+#state shape file from
+# http://www.arcgis.com/home/item.html?id=f7f805eb65eb4ab787a0a3e1116ca7e5
+loc <- file.path(tempdir(), "stats_dat")
+unzip(system.file("extdata", "states_21basic.zip", package = "fiftystater"),
+      exdir = loc)
+fifty_states_sp <- readOGR(dsn = loc, layer = "states", verbose = FALSE) %>%
+  spTransform(CRS("+init=epsg:2163"))
+
+alaska <- fifty_states_sp[fifty_states_sp$STATE_NAME == "Alaska", ] %>%
+  transform_state(-35, 2.5, c(-2400000, -2100000))
+proj4string(alaska) <- proj4string(fifty_states_sp)
+
+hawaii <- fifty_states_sp[fifty_states_sp$STATE_NAME == "Hawaii", ] %>%
+  transform_state(-35, .75, c(-1170000,-2363000))
+proj4string(hawaii) <- proj4string(fifty_states_sp)
+
+fifty_states <-
+  fifty_states_sp[!fifty_states_sp$STATE_NAME %in% c("Alaska","Hawaii"), ] %>%
+  rbind(alaska) %>%
+  rbind(hawaii) %>%
+  spTransform(CRS("+init=epsg:4326")) %>%
+  fortify(region = "STATE_NAME") %>%
+  mutate(id = tolower(id))
+```
+
+
+```{r}
+all_states <- map_data("state")
+
+p <- ggplot()
+p <- p + geom_polygon( data=all_states, aes(x=long, y=lat, group = group),colour="white", fill=sum_dem$V1)
+#p <- p + geom_polygon(data=sum_dem, aes(fill=V1))
+p
+```
+```{r}
+all_states <- rename(all_states, c(region = "State"))
+```
+
+```{r}
+sum_dem$State <- gsub("AL", "alabama", sum_dem$State)
+sum_dem$State <- gsub("AK", "alaska", sum_dem$State)
+sum_dem$State <- gsub("AR", "arkansas", sum_dem$State)
+sum_dem$State <- gsub("AZ", "arizona", sum_dem$State)
+sum_dem$State <- gsub("CA", "california", sum_dem$State)
+sum_dem$State <- gsub("CO", "colorado", sum_dem$State)
+sum_dem$State <- gsub("CT", "connecticut", sum_dem$State)
+sum_dem$State <- gsub("DE", "delaware", sum_dem$State)
+sum_dem$State <- gsub("FL", "florida", sum_dem$State)
+sum_dem$State <- gsub("GA", "georgia", sum_dem$State)
+sum_dem$State <- gsub("HI", "hawaii", sum_dem$State)
+sum_dem$State <- gsub("IA", "iowa", sum_dem$State)
+sum_dem$State <- gsub("ID", "idaho", sum_dem$State)
+sum_dem$State <- gsub("IL", "illinois", sum_dem$State)
+sum_dem$State <- gsub("IN", "indiana", sum_dem$State)
+sum_dem$State <- gsub("KS", "kansas", sum_dem$State)
+sum_dem$State <- gsub("KY", "kentucky", sum_dem$State)
+sum_dem$State <- gsub("LA", "louisiana", sum_dem$State)
+sum_dem$State <- gsub("MA", "massachusetts", sum_dem$State)
+sum_dem$State <- gsub("MD", "maryland", sum_dem$State)
+sum_dem$State <- gsub("ME", "maine", sum_dem$State)
+sum_dem$State <- gsub("MI", "michigan", sum_dem$State)
+sum_dem$State <- gsub("MN", "minnesota", sum_dem$State)
+sum_dem$State <- gsub("MO", "missouri", sum_dem$State)
+sum_dem$State <- gsub("MS", "mississippi", sum_dem$State)
+sum_dem$State <- gsub("MT", "montana", sum_dem$State)
+sum_dem$State <- gsub("NC", "north carolina", sum_dem$State)
+sum_dem$State <- gsub("ND", "north dakota", sum_dem$State)
+sum_dem$State <- gsub("NE", "nebraska", sum_dem$State)
+sum_dem$State <- gsub("NH", "new hampshire", sum_dem$State)
+sum_dem$State <- gsub("NJ", "new jersey", sum_dem$State)
+sum_dem$State <- gsub("NM", "new mexico", sum_dem$State)
+sum_dem$State <- gsub("NV", "nevada", sum_dem$State)
+sum_dem$State <- gsub("NY", "new york", sum_dem$State)
+sum_dem$State <- gsub("OH", "ohio", sum_dem$State)
+sum_dem$State <- gsub("OK", "oklahoma", sum_dem$State)
+sum_dem$State <- gsub("OR", "oregon", sum_dem$State)
+sum_dem$State <- gsub("PA", "pennsylvania", sum_dem$State)
+sum_dem$State <- gsub("RI", "rhode island", sum_dem$State)
+sum_dem$State <- gsub("SC", "south carolina", sum_dem$State)
+sum_dem$State <- gsub("SD", "south dakota", sum_dem$State)
+sum_dem$State <- gsub("TN", "tennessee", sum_dem$State)
+sum_dem$State <- gsub("TX", "texas", sum_dem$State)
+sum_dem$State <- gsub("UT", "utah", sum_dem$State)
+sum_dem$State <- gsub("VA", "virginia", sum_dem$State)
+sum_dem$State <- gsub("VT", "vermont", sum_dem$State)
+sum_dem$State <- gsub("WA", "washington", sum_dem$State)
+sum_dem$State <- gsub("WV", "west virginia", sum_dem$State)
+sum_dem$State <- gsub("WI", "wisconsin", sum_dem$State)
+sum_dem$State <- gsub("WY", "wyoming", sum_dem$State)
+
+
+
+```
+
+```{r}
+sum_rep$State <- gsub("AL", "alabama", sum_rep$State)
+sum_rep$State <- gsub("AK", "alaska", sum_rep$State)
+sum_rep$State <- gsub("AR", "arkansas", sum_rep$State)
+sum_rep$State <- gsub("AZ", "arizona", sum_rep$State)
+sum_rep$State <- gsub("CA", "california", sum_rep$State)
+sum_rep$State <- gsub("CO", "colorado", sum_rep$State)
+sum_rep$State <- gsub("CT", "connecticut", sum_rep$State)
+sum_rep$State <- gsub("DE", "delaware", sum_rep$State)
+sum_rep$State <- gsub("FL", "florida", sum_rep$State)
+sum_rep$State <- gsub("GA", "georgia", sum_rep$State)
+sum_rep$State <- gsub("HI", "hawaii", sum_rep$State)
+sum_rep$State <- gsub("IA", "iowa", sum_rep$State)
+sum_rep$State <- gsub("ID", "idaho", sum_rep$State)
+sum_rep$State <- gsub("IL", "illinois", sum_rep$State)
+sum_rep$State <- gsub("IN", "indiana", sum_rep$State)
+sum_rep$State <- gsub("KS", "kansas", sum_rep$State)
+sum_rep$State <- gsub("KY", "kentucky", sum_rep$State)
+sum_rep$State <- gsub("LA", "louisiana", sum_rep$State)
+sum_rep$State <- gsub("MA", "massachusetts", sum_rep$State)
+sum_rep$State <- gsub("MD", "maryland", sum_rep$State)
+sum_rep$State <- gsub("ME", "maine", sum_rep$State)
+sum_rep$State <- gsub("MI", "michigan", sum_rep$State)
+sum_rep$State <- gsub("MN", "minnesota", sum_rep$State)
+sum_rep$State <- gsub("MO", "missouri", sum_rep$State)
+sum_rep$State <- gsub("MS", "mississippi", sum_rep$State)
+sum_rep$State <- gsub("MT", "montana", sum_rep$State)
+sum_rep$State <- gsub("NC", "north carolina", sum_rep$State)
+sum_rep$State <- gsub("ND", "north dakota", sum_rep$State)
+sum_rep$State <- gsub("NE", "nebraska", sum_rep$State)
+sum_rep$State <- gsub("NH", "new hampshire", sum_rep$State)
+sum_rep$State <- gsub("NJ", "new jersey", sum_rep$State)
+sum_rep$State <- gsub("NM", "new mexico", sum_rep$State)
+sum_rep$State <- gsub("NV", "nevada", sum_rep$State)
+sum_rep$State <- gsub("NY", "new york", sum_rep$State)
+sum_rep$State <- gsub("OH", "ohio", sum_rep$State)
+sum_rep$State <- gsub("OK", "oklahoma", sum_rep$State)
+sum_rep$State <- gsub("OR", "oregon", sum_rep$State)
+sum_rep$State <- gsub("PA", "pennsylvania", sum_rep$State)
+sum_rep$State <- gsub("RI", "rhode island", sum_rep$State)
+sum_rep$State <- gsub("SC", "south carolina", sum_rep$State)
+sum_rep$State <- gsub("SD", "south dakota", sum_rep$State)
+sum_rep$State <- gsub("TN", "tennessee", sum_rep$State)
+sum_rep$State <- gsub("TX", "texas", sum_rep$State)
+sum_rep$State <- gsub("UT", "utah", sum_rep$State)
+sum_rep$State <- gsub("VA", "virginia", sum_rep$State)
+sum_rep$State <- gsub("VT", "vermont", sum_rep$State)
+sum_rep$State <- gsub("WA", "washington", sum_rep$State)
+sum_rep$State <- gsub("WV", "west virginia", sum_rep$State)
+sum_rep$State <- gsub("WI", "wisconsin", sum_rep$State)
+sum_rep$State <- gsub("WY", "wyoming", sum_rep$State)
+
+```
+
+```{r}
+MyMap_dem <- left_join(all_states, sum_dem, by ="State")
+
+#MyMap_rep <- merge(all_states, sum_rep, by = "State")
+
+```
+```{r}
+MyMap_dem <- group_by(MyMap_dem, State)
+#MyMap_dem <- MyMap_dem[-c(1:15459), ]
+MyMap_dem$V1=as.numeric(as.character(MyMap_dem$V1))
+```
+```{r}
+MyMap_dem$V1=as.numeric(levels(MyMap_dem$V1))[MyMap_dem$V1]
+usa <- map_data("state")
+ggplot() + 
+  geom_polygon(data=MyMap_dem, aes(x=long, y=lat, fill=State)) +
+  coord_fixed(1.3) + guides(fill=FALSE) +
+  scale_fill_continuous(low = "black", high = "green", limits = c(min(MyMap_dem$V1), max(MyMap_dem$V1)))
+
+
+```
+
+```{r}
+MyMap_rep$V1=as.numeric(levels(MyMap_rep$V1))[MyMap_rep$V1]
+usa <- map_data("state")
+ggplot() + 
+  geom_polygon(data=MyMap_rep, aes(x=long, y=lat, fill=State)) +
+  coord_fixed(1.3) + guides(fill=FALSE) +
+  scale_fill_continuous(low = "black", high = "green", limits = c(min(MyMap_rep$V1), max(MyMap_rep$V1)))
+
+
+```
+
+```{r}
+p <- ggplot(MyMap_dem, aes(long, lat, group = group))
+p <- p + geom_polygon(aes(fill = V1), colour = alpha("white", 1/2), size = 0.2)
+p <- p + coord_map(project = "lagrange")
+print(p)
+```
+
+```{r}
+#democrats map
+
+data("fifty_states") # this line is optional due to lazy data loading
+ggplot(MyMap_dem, aes(map_id = "State")) + 
+  # map points to the fifty_states shape data
+  geom_map(aes(fill = V1), map = fifty_states) + 
+  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
+  coord_map() +
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) +
+  labs(x = "", y = "") +
+  theme(legend.position = "bottom", 
+        panel.background = element_blank())
+```
+
+
+
+```{r}
+#republicans map
+data("fifty_states") # this line is optional due to lazy data loading
+ggplot(sum_rep, aes(map_id = "State")) + 
+  # map points to the fifty_states shape data
+  geom_map(aes(fill = V1), map = fifty_states) + 
+  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
+  coord_map() +
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) +
+  labs(x = "", y = "") +
+  theme(legend.position = "bottom", 
+        panel.background = element_blank())
+```
+
+
+
+
