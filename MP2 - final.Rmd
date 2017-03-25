@@ -221,9 +221,7 @@ theme_nothing <- function(base_size = 12, base_family = "Helvetica")
 ```
 ```{r}
 #MAPS
-states_map <- ggplot(data = all_states, mapping = aes(x = long, y = lat, group = group)) + 
-  coord_fixed(1.3) + 
-  geom_polygon(color = "black", fill = "gray")
+options(scipen=999)
 states_map + theme_nothing()
 ditch_the_axes <- theme(
   axis.text = element_blank(),
@@ -238,13 +236,15 @@ Rep_Map <- states_map +
       geom_polygon(data = MyMap_rep, aes(fill = transaction_amt)) +
      geom_polygon(color = "white", fill = NA) +
     theme_bw() +
-      ditch_the_axes
+      ditch_the_axes + scale_fill_gradient(low="pink", high="red2") + ggtitle("Republican Contributions in the Continental US - 2012 Election") + theme(plot.title = element_text(size = rel(1))) + theme(legend.title = element_text(face = "bold")) + theme(title = element_text(face = "bold")) + guides(fill=guide_legend(title="Contributions ($)"))
+
 Rep_Map
 #Democrats map 
 Dem_Map <- states_map + 
       geom_polygon(data = MyMap_dem, aes(fill = transaction_amt), color = "white") +
-      geom_polygon(color = "white", fill = NA) +
-      ditch_the_axes + theme_bw() 
+      geom_polygon(color = "white", fill = NA) + theme_bw() + scale_fill_gradient(low="lightblue", high="darkblue") +
+      ditch_the_axes + ggtitle("Democrat Contributions in the Continental US - 2012 Election") + theme(plot.title = element_text(size = rel(1.2))) + theme(legend.title = element_text(face = "bold")) + theme(title = element_text(face = "bold")) + guides(fill=guide_legend(title="Contributions ($)"))
+
 Dem_Map
 
 ```
